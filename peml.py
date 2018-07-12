@@ -112,27 +112,25 @@ class Loader:
         return self.data
 
     # -------------------------------------------------------------
-    def parse_start_key(key, quote, rest_of_line)
-      # Treat all keys as multi-line
-      self.parse_command_key('end')
+    def parse_start_key(self, key, quote, rest_of_line):
+        # Treat all keys as multi-line
+        self.parse_command_key('end')
 
-      self.flush_buffer!
+        self.flush_buffer()
 
-      self.increment_array_element(key)
+        self.increment_array_element(key)
 
-      key = 'value' if (@stack_scope && @stack_scope[:flags].match(/\+/))
-
-      @buffer_key = key
-      @buffer_string = rest_of_line
-
-      self.flush_buffer_into(key, replace: true)
-
-      if !quote.nil?
-        @is_quoted = true
-        @quote_string = quote
-      end
-    end
-
+        if self.stack_scope and self.stack_scope['flags'].match(r"\+"):
+            key = 'value'
+        
+        self.buffer_key = key
+        self.buffer_string = rest_of_line
+        
+        self.flush_buffer_into(key, replace=True)
+        
+        if quote is not None:
+            self.is_quoted = True
+            self.quote_string = quote
 
     # -------------------------------------------------------------
     def parse_array_element(value)
