@@ -1,6 +1,6 @@
 # PEML: The Program Exercise Markup Language
 
-This repository contains the **"peml" ruby gem**, a parser for PEML.
+This repository contains the **"peml" python module**, a parser for PEML.
 
 The **Programming Exercise Markup Language (PEML)** (feedback on
 name choice is welcome!) is intended to be a simple, easy format for
@@ -25,45 +25,32 @@ http://CSSPLICE.github.io/peml/
 
 ## Installation
 
-Add this line to your application's Gemfile:
-
-```ruby
-gem 'peml', :github => 'CSSPLICE/peml'
-```
-
-And then execute:
-
-    $ bundle
-
-Or install it using the gem command (may require you to clone the repository
-and build your own local copy of the gem to install).
+    pip install peml-python
 
 ## Usage
 
 ```
-require 'peml'
+import peml
 
-Peml.load("string containing a PEML description")
-=> nested hash representation of exercise
+peml.load("string containing a PEML description")
+# nested hash representation of exercise
 
-Peml.load_file("file_name.peml")
-=> nested has representation of the exercise
+peml.load_file("file_name.peml")
+# nested has representation of the exercise
 ```
 
 Eventually, we'll also add support for:
 
 ```
-require 'peml'
+import 'peml'
 
-Peml.dump(some_nested_hash)
-=> string containing exercise rendered in PEML format
+peml.dump(some_nested_hash)
+# string containing exercise rendered in PEML format
 
-my_exercise.to_peml
-=> string containing exercise rendered in PEML format
 ```
 
 ... but these don't work yet.
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/CSSPLICE/peml.
+Bug reports and pull requests are welcome on GitHub at https://github.com/acbart/peml-python.
