@@ -21,23 +21,23 @@ class Loader:
     SLUG_BLACKLIST     = (WHITESPACE_PATTERN+u"\u005B\u005C\u005D"
                                             +u"\u007B\u007D\u003A")
 
-    START_KEY     = re.compile(r"/^([^"+SLUG_BLACKLIST+r"]+)[ \t\r]*:"
-                               +r"(((\S)\4{2,})|[ \t\r]*)(.*(?:\n|\r|$))/",
+    START_KEY     = re.compile(r"^([^"+SLUG_BLACKLIST+r"]+)[ \t\r]*:"
+                               +r"(((\S)\4{2,})|[ \t\r]*)(.*(?:\n|\r|$))",
                                re.UNICODE)
-    COMMENT_LINE  = re.compile(r"/^\s*(#.*(?:\n|\r|$))/")
-    COMMAND_KEY   = re.compile(r"/^:[ \t\r]*(endskip|ignore|skip|end)(.*(?:\n|\r|$))/i")
-    ARRAY_ELEMENT = re.compile(r"/^\s*\*[ \t\r]*(.*(?:\n|\r|$))/")
-    SCOPE_PATTERN = re.compile(r"/^(\[|\{)[ \t\r]*([\+\.]*)[ \t\r]*([^"
+    COMMENT_LINE  = re.compile(r"^\s*(#.*(?:\n|\r|$))")
+    COMMAND_KEY   = re.compile(r"^:[ \t\r]*(endskip|ignore|skip|end)(.*(?:\n|\r|$))",
+                               re.IGNORECASE)
+    ARRAY_ELEMENT = re.compile(r"^\s*\*[ \t\r]*(.*(?:\n|\r|$))")
+    SCOPE_PATTERN = re.compile(r"^(\[|\{)[ \t\r]*([\+\.]*)[ \t\r]*([^"
                                +SLUG_BLACKLIST
-                               +r"]*)[ \t\r]*(?:\]|\}).*?(\n|\r|$)/")
+                               +r"]*)[ \t\r]*(?:\]|\}).*?(\n|\r|$)",
+                               re.UNICODE)
 
 
     #~ Public instance methods .................................................
 
     # -------------------------------------------------------------
     def __init__(self, options=None):
-        if options is None:
-            options = {}
         self.data = self.scope = {}
         
         self.stack = []
@@ -55,60 +55,61 @@ class Loader:
         self.default_options = {
             'comments': False
         }
-        self.default_options.update(options)
+        if options is not None:
+            self.default_options.update(options)
 
     # -------------------------------------------------------------
-    def load(stream, options = {})
-      @options = @default_options.merge(options)
+    def load(self, stream, options = None):
+        if options is None:
+            options = self.default_options.copy()
+        else:
+            options.update(self.default_options)
+        
+        for line in stream:
+            if self.done_parsing:
+                # Reached the end
+                return self.data
+            elif self.is_quoted:
+                # We're in a text literal string
+                if re.match(r"^"+self.quote_string+r"(?:\n|\r|$)"):
+                    # end quote
+                    self.parse_command_key('end')
+                    self.is_quoted = False
+                    self.quote_string = ''
+                else:
+                    self.parse_text(line)
+            elif self.COMMENT_LINE.match(line):
+                # Skip comments
+                pass
+            elif self.COMMAND_KEY.match(line):
+                m = self.COMMAND_KEY.match(line)
+                self.parse_command_key(m.group(1).lower())
+            elif self.skipping:
+                # should we just ignore this text, instead of parsing it?
+                self.parse_text(line)
+            elif (self.START_KEY.match(line) and
+                  (not self.stack_scope or 
+                   self.stack_scope['array_type'] != 'simple')):
+                m = self.START_KEY.match(line)
+                self.parse_start_key(m.group(1), m.group(3), m.group(5) or '')
+            elif (self.ARRAY_ELEMENT.match(line) and self.stack_scope and
+                  self.stack_scope['array'] and 
+                  (self.stack_scope['array_type'] != 'complex') and
+                  not self.stack_scope['flags'].match(r"\+")):
+                m = self.ARRAY_ELEMENT.match(line)
+                self.parse_array_element(m.group(1))
+            elif self.SCOPE_PATTERN.match(line):
+                m = self.SCOPE_PATTERN.match(line)
+                self.parse_scope(m.group(1), m.group(2), m.group(3))
+            else:
+                # just plain text
+                self.parse_text(line)
 
-      stream.each_line do |line|
-        return @data if @done_parsing
+        # Treat all keys as multi-line
+        self.parse_command_key('end')
 
-        if @is_quoted
-          if line.match(/^#{@quote_string}(?:\n|\r|$)/)
-            # end quote
-            self.parse_command_key('end')
-            @is_quoted = false
-            @quote_string = ''
-          else
-            self.parse_text(line)
-          end
-
-        elsif match = line.match(COMMENT_LINE)
-          # just skip it!
-
-        elsif match = line.match(COMMAND_KEY)
-          self.parse_command_key(match[1].downcase)
-
-        elsif @skipping
-          # should we just ignore this text, instead of parsing it?
-          self.parse_text(line)
-
-        elsif (match = line.match(START_KEY)) &&
-            (!@stack_scope || @stack_scope[:array_type] != :simple)
-          self.parse_start_key(match[1], match[3], match[5] || '')
-
-        elsif (match = line.match(ARRAY_ELEMENT)) && @stack_scope &&
-          @stack_scope[:array] && (@stack_scope[:array_type] != :complex ) &&
-          !@stack_scope[:flags].match(/\+/)
-          self.parse_array_element(match[1])
-
-        elsif match = line.match(SCOPE_PATTERN)
-          self.parse_scope(match[1], match[2], match[3])
-
-        else
-          # just plain text
-          self.parse_text(line)
-        end
-      end
-
-      # Treat all keys as multi-line
-      self.parse_command_key('end')
-
-      self.flush_buffer!
-      return @data
-    end
-
+        self.flush_buffer()
+        return self.data
 
     # -------------------------------------------------------------
     def parse_start_key(key, quote, rest_of_line)
