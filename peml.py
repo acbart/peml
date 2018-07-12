@@ -133,47 +133,47 @@ class Loader:
             self.quote_string = quote
 
     # -------------------------------------------------------------
-    def parse_array_element(value)
-      # Treat all keys as multi-line
-      self.parse_command_key('end')
+    def parse_array_element(self, value):
+        # Treat all keys as multi-line
+        self.parse_command_key('end')
 
-      self.flush_buffer!
+        self.flush_buffer()
 
-      @stack_scope[:array_type] ||= :simple
-
-      @stack_scope[:array] << ''
-      @buffer_key = @stack_scope[:array]
-      @buffer_string = value
-      self.flush_buffer_into(@stack_scope[:array], replace: true)
-    end
-
+        if ('array_type' not in self.stack_scope
+            or not self.stack_scope['array_type']):
+            self.stack_scope['array_type'] = 'simple'
+            
+        self.stack_scope['array'].append('')
+        self.buffer_key = self.stack_scope['array']
+        self.buffer_string = value
+        self.flush_buffer_into(self.stack_scope['array'], replace=True)
 
     # -------------------------------------------------------------
     def parse_command_key(command)
-      if @is_skipping && !%w(endskip ignore).include?(command)
+      if self.is_skipping && !%w(endskip ignore).include?(command)
         return self.flush_buffer!
       end
 
       case command
         when "end"
-          self.flush_buffer_into(@buffer_key, replace: false) if @buffer_key
-          @buffer_key = nil
+          self.flush_buffer_into(self.buffer_key, replace: false) if self.buffer_key
+          self.buffer_key = nil
           return
 
         when "ignore"
           # If this occurs in the middle of a multi-line value, save what
           # has been accumulated so far
-          self.flush_buffer_into(@buffer_key, replace: false) if @buffer_key
-          return @done_parsing = true
+          self.flush_buffer_into(self.buffer_key, replace: false) if self.buffer_key
+          return self.done_parsing = true
 
         when "skip"
           # If this occurs in the middle of a multi-line value, save what
           # has been accumulated so far
-          self.flush_buffer_into(@buffer_key, replace: false) if @buffer_key
-          @is_skipping = true
+          self.flush_buffer_into(self.buffer_key, replace: false) if self.buffer_key
+          self.is_skipping = true
 
         when "endskip"
-          @is_skipping = false
+          self.is_skipping = false
       end
 
       self.flush_buffer!
@@ -188,26 +188,26 @@ class Loader:
       self.flush_buffer!
 
       if scope_key == ''
-        last_stack_item = @stack.pop
-        @scope = (last_stack_item ? last_stack_item[:scope] : @data) || @data
-        @stack_scope = @stack.last
+        last_stack_item = self.stack.pop
+        self.scope = (last_stack_item ? last_stack_item[:scope] : self.data) || self.data
+        self.stack_scope = self.stack.last
 
       elsif %w([ {).include?(scope_type)
         nesting = false
-        key_scope = @data
+        key_scope = self.data
 
         if flags.match(/^\./)
           self.increment_array_element(scope_key)
           nesting = true
-          key_scope = @scope if @stack_scope
+          key_scope = self.scope if self.stack_scope
         else
-          @scope = @data
-          @stack = []
+          self.scope = self.data
+          self.stack = []
         end
 
         # Within freeforms, the `type` of nested objects and arrays is taken
         # verbatim from the `keyScope`.
-        if @stack_scope && @stack_scope[:flags].match(/\+/)
+        if self.stack_scope && self.stack_scope[:flags].match(/\+/)
           parsed_scope_key = scope_key
 
           # Outside of freeforms, dot-notation interpreted as nested data.
@@ -220,11 +220,11 @@ class Loader:
         end
 
         # Content of nested scopes within a freeform should be stored under "value."
-        if (@stack_scope && @stack_scope[:flags].match(/\+/) && flags.match(/\./))
+        if (self.stack_scope && self.stack_scope[:flags].match(/\+/) && flags.match(/\./))
           if scope_type == '['
             parsed_scope_key = 'value'
           elsif scope_type == '{'
-            @scope = @scope[:value] = {}
+            self.scope = self.scope[:value] = {}
           end
         end
 
@@ -233,26 +233,26 @@ class Loader:
             array_type: nil,
             array_first_key: nil,
             flags: flags,
-            scope: @scope
+            scope: self.scope
         }
         if scope_type == '['
           stack_scope_item[:array] = key_scope[parsed_scope_key] = []
           stack_scope_item[:array_type] = :freeform if flags.match(/\+/)
           if nesting
-            @stack << stack_scope_item
+            self.stack << stack_scope_item
           else
-            @stack = [stack_scope_item]
+            self.stack = [stack_scope_item]
           end
-          @stack_scope = @stack.last
+          self.stack_scope = self.stack.last
 
         elsif scope_type == '{'
           if nesting
-            @stack << stack_scope_item
+            self.stack << stack_scope_item
           else
-            @scope = key_scope[parsed_scope_key] = key_scope[parsed_scope_key].is_a?(Hash) ? key_scope[parsed_scope_key] : {}
-            @stack = [stack_scope_item]
+            self.scope = key_scope[parsed_scope_key] = key_scope[parsed_scope_key].is_a?(Hash) ? key_scope[parsed_scope_key] : {}
+            self.stack = [stack_scope_item]
           end
-          @stack_scope = @stack.last
+          self.stack_scope = self.stack.last
         end
       end
     end
@@ -260,10 +260,10 @@ class Loader:
 
     # -------------------------------------------------------------
     def parse_text(text)
-      if @stack_scope && @stack_scope[:flags].match(/\+/) && text.match(/[^\n\r\s]/)
-        @stack_scope[:array] << { "type" => "text", "value" => text.gsub(/(^\s*)|(\s*$)/, '') }
+      if self.stack_scope && self.stack_scope[:flags].match(/\+/) && text.match(/[^\n\r\s]/)
+        self.stack_scope[:array] << { "type" => "text", "value" => text.gsub(/(^\s*)|(\s*$)/, '') }
       else
-        @buffer_string += text
+        self.buffer_string += text
       end
     end
 
@@ -274,20 +274,20 @@ class Loader:
       # which key was encountered first. If this is a duplicate encounter of
       # that key, start a new object.
 
-      if @stack_scope && @stack_scope[:array]
+      if self.stack_scope && self.stack_scope[:array]
         # If we're within a simple array, ignore
-        @stack_scope[:array_type] ||= :complex
-        return if @stack_scope[:array_type] == :simple
+        self.stack_scope[:array_type] ||= :complex
+        return if self.stack_scope[:array_type] == :simple
 
         # array_first_key may be either another key, or nil
-        if @stack_scope[:array_first_key] == nil || @stack_scope[:array_first_key] == key
-          @stack_scope[:array] << (@scope = {})
+        if self.stack_scope[:array_first_key] == nil || self.stack_scope[:array_first_key] == key
+          self.stack_scope[:array] << (self.scope = {})
         end
-        if (@stack_scope[:flags].match(/\+/))
-          @scope[:type] = key
+        if (self.stack_scope[:flags].match(/\+/))
+          self.scope[:type] = key
           # key = 'content'
         else
-          @stack_scope[:array_first_key] ||= key
+          self.stack_scope[:array_first_key] ||= key
         end
       end
     end
@@ -295,31 +295,31 @@ class Loader:
 
     # -------------------------------------------------------------
     def flush_buffer!
-      result = @buffer_string.dup
+      result = self.buffer_string.dup
       puts "    flushed content = #{result.inspect}"
-      @buffer_string = ''
-      @buffer_key = nil
+      self.buffer_string = ''
+      self.buffer_key = nil
       return result
     end
 
 
     # -------------------------------------------------------------
     def flush_buffer_into(key, options = {})
-      existing_buffer_key = @buffer_key
+      existing_buffer_key = self.buffer_key
       value = self.flush_buffer!
 
       if options[:replace]
-        if @is_quoted
-          @buffer_string = value
+        if self.is_quoted
+          self.buffer_string = value
         else
           value = self.format_value(value, :replace).sub(/^\s*/, '')
-          @buffer_string = value.match(/\s*\Z/)[0]
+          self.buffer_string = value.match(/\s*\Z/)[0]
         end
-        @buffer_key = existing_buffer_key
+        self.buffer_key = existing_buffer_key
       else
         value = self.format_value(value, :append)
       end
-      if !@is_quoted
+      if !self.is_quoted
         value = value.sub(/\s*\Z/, '')
       end
       puts "    flushed content = #{value.inspect}"
@@ -330,15 +330,15 @@ class Loader:
 
       else
         key_bits = key.split('.')
-        @buffer_scope = @scope
+        self.buffer_scope = self.scope
 
         key_bits[0...-1].each do |bit|
-          @buffer_scope[bit] = {} if @buffer_scope[bit].class == String # reset
-          @buffer_scope = @buffer_scope[bit] ||= {}
+          self.buffer_scope[bit] = {} if self.buffer_scope[bit].class == String # reset
+          self.buffer_scope = self.buffer_scope[bit] ||= {}
         end
 
-        @buffer_scope[key_bits.last] = '' if options[:replace]
-        @buffer_scope[key_bits.last] += value
+        self.buffer_scope[key_bits.last] = '' if options[:replace]
+        self.buffer_scope[key_bits.last] += value
       end
     end
 
