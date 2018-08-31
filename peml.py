@@ -149,7 +149,7 @@ class Loader:
         self.flush_buffer_into(self.stack_scope['array'], replace=True)
 
     # -------------------------------------------------------------
-    def parse_command_key(self, command)
+    def parse_command_key(self, command):
         if self.is_skipping and command not in ('endskip', 'ignore'):
             return self.flush_buffer()
 
@@ -175,7 +175,7 @@ class Loader:
         elif command == "endskip":
             self.is_skipping = False
     
-    self.flush_buffer()
+        self.flush_buffer()
 
 
     # -------------------------------------------------------------
@@ -188,7 +188,7 @@ class Loader:
         if scope_key == '':
             last_stack_item = self.stack.pop()
             self.scope = (last_stack_item['scope'] if last_stack_item 
-                         \ else self.data or self.data)
+                          else self.data or self.data)
             self.stack_scope = self.stack.last
         elif scope_type in ('[', '{'):
             nesting = False
@@ -208,7 +208,7 @@ class Loader:
                 parsed_scope_key = scope_key
 
                 # Outside of freeforms, dot-notation interpreted as nested data.
-            else
+            else:
                 key_bits = scope_key.split('.')
                 for bit in key_bits[:-1]:
                     if bit not in key_scope:
@@ -239,14 +239,14 @@ class Loader:
                     stack_scope_item['array_type'] = 'freeform'
                 if nesting:
                     self.stack.push(stack_scope_item)
-                else
+                else:
                     self.stack = [stack_scope_item]
                 self.stack_scope = self.stack[-1]
 
             elif scope_type == '{':
                 if nesting:
                     self.stack.push(stack_scope_item)
-                else
+                else:
                     if not isinstance(key_scope[parsed_scope_key], dict):
                         key_scope[parsed_scope_key] = {}
                     self.scope = key_scope[parsed_scope_key]
@@ -263,7 +263,7 @@ class Loader:
                 "type" : "text", 
                 "value" : re.sub(r'(^\s*)|(\s*$)', '', text)
             })
-      else:
+        else:
             self.buffer_string += text
 
 
@@ -304,7 +304,7 @@ class Loader:
 
 
     # -------------------------------------------------------------
-    def flush_buffer_into(self, key, options = None)
+    def flush_buffer_into(self, key, options = None):
         if options is None:
             options = {}
         existing_buffer_key = self.buffer_key
@@ -353,7 +353,7 @@ class Loader:
     # If we're appending to a multi-line string, escape special punctuation
     # by prepending the line with a backslash.
     # (:, [, {, *, \) surrounding the first token of any line.
-    def format_value(self, value, type)
+    def format_value(self, value, type):
         # backslash-escaped leading characters have been removed in favor of
         # quoted values.
         #
