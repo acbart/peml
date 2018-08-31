@@ -149,7 +149,7 @@ class Loader:
         self.flush_buffer_into(self.stack_scope['array'], replace=True)
 
     # -------------------------------------------------------------
-    def parse_command_key(command)
+    def parse_command_key(self, command)
         if self.is_skipping and command not in ('endskip', 'ignore'):
             return self.flush_buffer()
 
@@ -179,7 +179,7 @@ class Loader:
 
 
     # -------------------------------------------------------------
-    def parse_scope(scope_type, flags, scope_key):
+    def parse_scope(self, scope_type, flags, scope_key):
         # Treat all keys as multi-line
         self.parse_command_key('end')
 
@@ -188,7 +188,7 @@ class Loader:
         if scope_key == '':
             last_stack_item = self.stack.pop()
             self.scope = (last_stack_item['scope'] if last_stack_item 
-                          else self.data or self.data)
+                         \ else self.data or self.data)
             self.stack_scope = self.stack.last
         elif scope_type in ('[', '{'):
             nesting = False
@@ -255,7 +255,7 @@ class Loader:
 
 
     # -------------------------------------------------------------
-    def parse_text(text):
+    def parse_text(self, text):
         if (self.stack_scope and 
             self.stack_scope['flags'].match(r'\+') and
             text.match(r'[^\n\r\s]')):
@@ -268,7 +268,7 @@ class Loader:
 
 
     # -------------------------------------------------------------
-    def increment_array_element(key):
+    def increment_array_element(self, key):
         # Special handling for arrays. If this is the start of the array, remember
         # which key was encountered first. If this is a duplicate encounter of
         # that key, start a new object.
@@ -294,53 +294,56 @@ class Loader:
 
 
     # -------------------------------------------------------------
-    def flush_buffer!
-      result = self.buffer_string.dup
-      puts "    flushed content = #{result.inspect}"
-      self.buffer_string = ''
-      self.buffer_key = nil
-      return result
-    end
+    def flush_buffer(self):
+        result = self.buffer_string
+        # TODO: is this the correct translation?
+        print("    flushed content = {}".format(repr(result)))
+        self.buffer_string = ''
+        self.buffer_key = None
+        return result
 
 
     # -------------------------------------------------------------
-    def flush_buffer_into(key, options = {})
-      existing_buffer_key = self.buffer_key
-      value = self.flush_buffer!
+    def flush_buffer_into(self, key, options = None)
+        if options is None:
+            options = {}
+        existing_buffer_key = self.buffer_key
+        value = self.flush_buffer()
 
-      if options[:replace]
-        if self.is_quoted
-          self.buffer_string = value
-        else
-          value = self.format_value(value, :replace).sub(/^\s*/, '')
-          self.buffer_string = value.match(/\s*\Z/)[0]
-        end
-        self.buffer_key = existing_buffer_key
-      else
-        value = self.format_value(value, :append)
-      end
-      if !self.is_quoted
-        value = value.sub(/\s*\Z/, '')
-      end
-      puts "    flushed content = #{value.inspect}"
+        if options['replace']:
+            if self.is_quoted:
+                self.buffer_string = value
+            else:
+                value = re.sub(r'^\s*', '',
+                               self.format_value(value, 'replace'))
+                self.buffer_string = re.match(r'\s*\Z', value).group(0)
+            self.buffer_key = existing_buffer_key
+        else:
+            value = self.format_value(value, 'append')
+        if not self.is_quoted:
+            value = re.sub(r'\s*\Z', '', value)
+        print("    flushed content = {}".format(repr(value)))
 
-      if key.class == Array
-        key[key.length - 1] = '' if options[:replace]
-        key[key.length - 1] += value
+        if isinstance(key, list):
+            if options['replace']:
+                key[-1] = ''
+            key[-1] += value
 
-      else
-        key_bits = key.split('.')
-        self.buffer_scope = self.scope
+        else:
+            key_bits = key.split('.')
+            self.buffer_scope = self.scope
 
-        key_bits[0...-1].each do |bit|
-          self.buffer_scope[bit] = {} if self.buffer_scope[bit].class == String # reset
-          self.buffer_scope = self.buffer_scope[bit] ||= {}
-        end
+            for bit in key_bits[:-1]:
+                if isinstance(self.buffer_scope[bit], str):
+                    self.buffer_scope[bit] = {} # reset
+                if ('bit' not in self.buffer_scope or
+                    not self.buffer_scope[bit]):
+                    self.buffer_scope[bit] = {}
+                self.buffer_scope = self.buffer_scope[bit]
 
-        self.buffer_scope[key_bits.last] = '' if options[:replace]
-        self.buffer_scope[key_bits.last] += value
-      end
-    end
+            if options['replace']:
+                self.buffer_scope[key_bits[-1]] = ''
+            self.buffer_scope[key_bits[-1]] += value
 
 
     # -------------------------------------------------------------
@@ -350,20 +353,16 @@ class Loader:
     # If we're appending to a multi-line string, escape special punctuation
     # by prepending the line with a backslash.
     # (:, [, {, *, \) surrounding the first token of any line.
-    def format_value(value, type)
-      # backslash-escaped leading characters have been removed in favor of
-      # quoted values.
-      #
-      # if type == :append
-      #  value.gsub!(/^(\s*)\\/, '\1')
-      # end
+    def format_value(self, value, type)
+        # backslash-escaped leading characters have been removed in favor of
+        # quoted values.
+        #
+        # if type == :append
+        #  value.gsub!(/^(\s*)\\/, '\1')
+        # end
 
-      # puts "    after formatting = #{value.inspect}"
-      value
-    end
-
-  end
-end
+        # puts "    after formatting = #{value.inspect}"
+        return value
 
 
 def load(fp):
