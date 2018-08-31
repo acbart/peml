@@ -42,9 +42,9 @@ peml.load_file("file_name.peml")
 Eventually, we'll also add support for:
 
 ```
-import 'peml'
+import peml
 
-peml.dump(some_nested_hash)
+peml.dump(some_nested_data)
 # string containing exercise rendered in PEML format
 
 ```
