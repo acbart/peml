@@ -150,147 +150,147 @@ class Loader:
 
     # -------------------------------------------------------------
     def parse_command_key(command)
-      if self.is_skipping && !%w(endskip ignore).include?(command)
-        return self.flush_buffer!
-      end
+        if self.is_skipping and command not in ('endskip', 'ignore'):
+            return self.flush_buffer()
 
-      case command
-        when "end"
-          self.flush_buffer_into(self.buffer_key, replace: false) if self.buffer_key
-          self.buffer_key = nil
-          return
+        if command == "end":
+            if self.buffer_key:
+                self.flush_buffer_into(self.buffer_key, replace=False)
+            self.buffer_key = None
+            return
+        elif command == "ignore":
+            # If this occurs in the middle of a multi-line value, save what
+            # has been accumulated so far
+            if self.buffer_key:
+                self.flush_buffer_into(self.buffer_key, replace=False)
+            self.done_parsing = True
+            return self.done_parsing
+        elif command == "skip":
+            # If this occurs in the middle of a multi-line value, save what
+            # has been accumulated so far
+            if self.buffer_key:
+                self.flush_buffer_into(self.buffer_key, replace=False)
+            self.is_skipping = True
 
-        when "ignore"
-          # If this occurs in the middle of a multi-line value, save what
-          # has been accumulated so far
-          self.flush_buffer_into(self.buffer_key, replace: false) if self.buffer_key
-          return self.done_parsing = true
-
-        when "skip"
-          # If this occurs in the middle of a multi-line value, save what
-          # has been accumulated so far
-          self.flush_buffer_into(self.buffer_key, replace: false) if self.buffer_key
-          self.is_skipping = true
-
-        when "endskip"
-          self.is_skipping = false
-      end
-
-      self.flush_buffer!
-    end
+        elif command == "endskip":
+            self.is_skipping = False
+    
+    self.flush_buffer()
 
 
     # -------------------------------------------------------------
-    def parse_scope(scope_type, flags, scope_key)
-      # Treat all keys as multi-line
-      self.parse_command_key('end')
+    def parse_scope(scope_type, flags, scope_key):
+        # Treat all keys as multi-line
+        self.parse_command_key('end')
 
-      self.flush_buffer!
+        self.flush_buffer()
 
-      if scope_key == ''
-        last_stack_item = self.stack.pop
-        self.scope = (last_stack_item ? last_stack_item[:scope] : self.data) || self.data
-        self.stack_scope = self.stack.last
+        if scope_key == '':
+            last_stack_item = self.stack.pop()
+            self.scope = (last_stack_item['scope'] if last_stack_item 
+                          else self.data or self.data)
+            self.stack_scope = self.stack.last
+        elif scope_type in ('[', '{'):
+            nesting = False
+            key_scope = self.data
 
-      elsif %w([ {).include?(scope_type)
-        nesting = false
-        key_scope = self.data
+            if flags.match(r'^\.'):
+                self.increment_array_element(scope_key)
+                nesting = True
+                key_scope = self.scope if self.stack_scope else None
+            else:
+                self.scope = self.data
+                self.stack = []
 
-        if flags.match(/^\./)
-          self.increment_array_element(scope_key)
-          nesting = true
-          key_scope = self.scope if self.stack_scope
-        else
-          self.scope = self.data
-          self.stack = []
-        end
+            # Within freeforms, the `type` of nested objects and arrays is taken
+            # verbatim from the `keyScope`.
+            if self.stack_scope and self.stack_scope['flags'].match(r'\+'):
+                parsed_scope_key = scope_key
 
-        # Within freeforms, the `type` of nested objects and arrays is taken
-        # verbatim from the `keyScope`.
-        if self.stack_scope && self.stack_scope[:flags].match(/\+/)
-          parsed_scope_key = scope_key
+                # Outside of freeforms, dot-notation interpreted as nested data.
+            else
+                key_bits = scope_key.split('.')
+                for bit in key_bits[:-1]:
+                    if bit not in key_scope:
+                        key_scope[bit] = {}
+                    key_scope = key_scope[bit]
+                parsed_scope_key = key_bits[-1]
+            
+            # Content of nested scopes within a freeform should be stored under "value."
+            if (self.stack_scope and 
+                self.stack_scope['flags'].match(r'\+') and
+                flags.match(r'\.')):
+                if scope_type == '[':
+                    parsed_scope_key = 'value'
+                elif scope_type == '{':
+                    self.scope = self.scope['value'] = {}
 
-          # Outside of freeforms, dot-notation interpreted as nested data.
-        else
-          key_bits = scope_key.split('.')
-          key_bits[0...-1].each do |bit|
-            key_scope = key_scope[bit] ||= {}
-          end
-          parsed_scope_key = key_bits.last
-        end
+            stack_scope_item = {
+                'array': None,
+                'array_type': None,
+                'array_first_key': None,
+                'flags': flags,
+                'scope': self.scope
+            }
+            if scope_type == '[':
+                key_scope[parsed_scope_key] = []
+                stack_scope_item['array'] = key_scope[parsed_scope_key]
+                if flags.match(r'\+'):
+                    stack_scope_item['array_type'] = 'freeform'
+                if nesting:
+                    self.stack.push(stack_scope_item)
+                else
+                    self.stack = [stack_scope_item]
+                self.stack_scope = self.stack[-1]
 
-        # Content of nested scopes within a freeform should be stored under "value."
-        if (self.stack_scope && self.stack_scope[:flags].match(/\+/) && flags.match(/\./))
-          if scope_type == '['
-            parsed_scope_key = 'value'
-          elsif scope_type == '{'
-            self.scope = self.scope[:value] = {}
-          end
-        end
-
-        stack_scope_item = {
-            array: nil,
-            array_type: nil,
-            array_first_key: nil,
-            flags: flags,
-            scope: self.scope
-        }
-        if scope_type == '['
-          stack_scope_item[:array] = key_scope[parsed_scope_key] = []
-          stack_scope_item[:array_type] = :freeform if flags.match(/\+/)
-          if nesting
-            self.stack << stack_scope_item
-          else
-            self.stack = [stack_scope_item]
-          end
-          self.stack_scope = self.stack.last
-
-        elsif scope_type == '{'
-          if nesting
-            self.stack << stack_scope_item
-          else
-            self.scope = key_scope[parsed_scope_key] = key_scope[parsed_scope_key].is_a?(Hash) ? key_scope[parsed_scope_key] : {}
-            self.stack = [stack_scope_item]
-          end
-          self.stack_scope = self.stack.last
-        end
-      end
-    end
+            elif scope_type == '{':
+                if nesting:
+                    self.stack.push(stack_scope_item)
+                else
+                    if not isinstance(key_scope[parsed_scope_key], dict):
+                        key_scope[parsed_scope_key] = {}
+                    self.scope = key_scope[parsed_scope_key]
+                    self.stack = [stack_scope_item]
+                self.stack_scope = self.stack[-1]
 
 
     # -------------------------------------------------------------
-    def parse_text(text)
-      if self.stack_scope && self.stack_scope[:flags].match(/\+/) && text.match(/[^\n\r\s]/)
-        self.stack_scope[:array] << { "type" => "text", "value" => text.gsub(/(^\s*)|(\s*$)/, '') }
-      else
-        self.buffer_string += text
-      end
-    end
+    def parse_text(text):
+        if (self.stack_scope and 
+            self.stack_scope['flags'].match(r'\+') and
+            text.match(r'[^\n\r\s]')):
+            self.stack_scope['array'].push({ 
+                "type" : "text", 
+                "value" : re.sub(r'(^\s*)|(\s*$)', '', text)
+            })
+      else:
+            self.buffer_string += text
 
 
     # -------------------------------------------------------------
-    def increment_array_element(key)
-      # Special handling for arrays. If this is the start of the array, remember
-      # which key was encountered first. If this is a duplicate encounter of
-      # that key, start a new object.
+    def increment_array_element(key):
+        # Special handling for arrays. If this is the start of the array, remember
+        # which key was encountered first. If this is a duplicate encounter of
+        # that key, start a new object.
 
-      if self.stack_scope && self.stack_scope[:array]
-        # If we're within a simple array, ignore
-        self.stack_scope[:array_type] ||= :complex
-        return if self.stack_scope[:array_type] == :simple
+        if self.stack_scope and self.stack_scope['array']:
+            # If we're within a simple array, ignore
+            if not self.stack_scope['array_type']:
+                self.stack_scope['array_type'] = 'complex'
+            if self.stack_scope['array_type'] == 'simple':
+                return
 
-        # array_first_key may be either another key, or nil
-        if self.stack_scope[:array_first_key] == nil || self.stack_scope[:array_first_key] == key
-          self.stack_scope[:array] << (self.scope = {})
-        end
-        if (self.stack_scope[:flags].match(/\+/))
-          self.scope[:type] = key
-          # key = 'content'
-        else
-          self.stack_scope[:array_first_key] ||= key
-        end
-      end
-    end
+            # array_first_key may be either another key, or nil
+            if (self.stack_scope['array_first_key'] == None or
+                self.stack_scope['array_first_key'] == key):
+                self.scope = {}
+                self.stack_scope['array'].push(self.scope)
+            if self.stack_scope['flags'].match(r'\+'):
+                self.scope['type'] = key
+                # key = 'content'
+            else:
+                if not self.stack_scope['array_first_key']:
+                    self.stack_scope['array_first_key'] = key
 
 
     # -------------------------------------------------------------
