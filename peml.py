@@ -297,7 +297,7 @@ class Loader:
     def flush_buffer(self):
         result = self.buffer_string
         # TODO: is this the correct translation?
-        print("    flushed content = {}".format(repr(result)))
+        #print("    flushed content = {}".format(repr(result)))
         self.buffer_string = ''
         self.buffer_key = None
         return result
@@ -321,7 +321,7 @@ class Loader:
             value = self.format_value(value, 'append')
         if not self.is_quoted:
             value = re.sub(r'\s*\Z', '', value)
-        print("    flushed content = {}".format(repr(value)))
+        #print("    flushed content = {}".format(repr(value)))
 
         if isinstance(key, list):
             if replace:
