@@ -1,4 +1,8 @@
 import unittest
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import peml
 
 class PemlFiles(unittest.TestCase):
@@ -9,7 +13,12 @@ class PemlFiles(unittest.TestCase):
         pass
         
     def test_it_does_something_useful(self):
-        pass
+        peml.loads('')
+    
+    def test_reading_from_file(self):
+        with open('test/palindrome.peml', 'r') as palindrome_file:
+            data = peml.load(palindrome_file)
+        self.assertFalse(data)
 
 if __name__ == '__main__':
-    pass
+    unittest.main(buffer=False)
