@@ -84,7 +84,7 @@ class Loader:
             elif self.COMMAND_KEY.match(line):
                 m = self.COMMAND_KEY.match(line)
                 self.parse_command_key(m.group(1).lower())
-            elif self.skipping:
+            elif self.is_skipping:
                 # should we just ignore this text, instead of parsing it?
                 self.parse_text(line)
             elif (self.START_KEY.match(line) and
