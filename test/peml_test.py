@@ -18,7 +18,7 @@ class PemlFiles(unittest.TestCase):
     def test_reading_from_file(self):
         with open('test/palindrome.peml', 'r') as palindrome_file:
             data = peml.load(palindrome_file)
-        self.assertFalse(data)
+        self.assertTrue(data)
 
 if __name__ == '__main__':
     unittest.main(buffer=False)

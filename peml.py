@@ -71,7 +71,7 @@ class Loader:
                 return self.data
             elif self.is_quoted:
                 # We're in a text literal string
-                if re.match(r"^"+self.quote_string+r"(?:\n|\r|$)"):
+                if re.match(r"^"+self.quote_string+r"(?:\n|\r|$)", line):
                     # end quote
                     self.parse_command_key('end')
                     self.is_quoted = False
@@ -95,7 +95,7 @@ class Loader:
             elif (self.ARRAY_ELEMENT.match(line) and self.stack_scope and
                   self.stack_scope['array'] and 
                   (self.stack_scope['array_type'] != 'complex') and
-                  not self.stack_scope['flags'].match(r"\+")):
+                  not re.match(r"\+", self.stack_scope['flags'])):
                 m = self.ARRAY_ELEMENT.match(line)
                 self.parse_array_element(m.group(1))
             elif self.SCOPE_PATTERN.match(line):
@@ -120,7 +120,7 @@ class Loader:
 
         self.increment_array_element(key)
 
-        if self.stack_scope and self.stack_scope['flags'].match(r"\+"):
+        if self.stack_scope and re.match(r"\+", self.stack_scope['flags']):
             key = 'value'
         
         self.buffer_key = key
@@ -194,7 +194,7 @@ class Loader:
             nesting = False
             key_scope = self.data
 
-            if flags.match(r'^\.'):
+            if re.match(r'^\.', flags):
                 self.increment_array_element(scope_key)
                 nesting = True
                 key_scope = self.scope if self.stack_scope else None
@@ -204,7 +204,7 @@ class Loader:
 
             # Within freeforms, the `type` of nested objects and arrays is taken
             # verbatim from the `keyScope`.
-            if self.stack_scope and self.stack_scope['flags'].match(r'\+'):
+            if self.stack_scope and re.match(r'\+', self.stack_scope['flags']):
                 parsed_scope_key = scope_key
 
                 # Outside of freeforms, dot-notation interpreted as nested data.
@@ -218,8 +218,8 @@ class Loader:
             
             # Content of nested scopes within a freeform should be stored under "value."
             if (self.stack_scope and 
-                self.stack_scope['flags'].match(r'\+') and
-                flags.match(r'\.')):
+                re.match(r'\+', self.stack_scope['flags']) and
+                re.match(r'\.', flags)):
                 if scope_type == '[':
                     parsed_scope_key = 'value'
                 elif scope_type == '{':
@@ -235,7 +235,7 @@ class Loader:
             if scope_type == '[':
                 key_scope[parsed_scope_key] = []
                 stack_scope_item['array'] = key_scope[parsed_scope_key]
-                if flags.match(r'\+'):
+                if re.match(r'\+', flags):
                     stack_scope_item['array_type'] = 'freeform'
                 if nesting:
                     self.stack.push(stack_scope_item)
@@ -257,8 +257,8 @@ class Loader:
     # -------------------------------------------------------------
     def parse_text(self, text):
         if (self.stack_scope and 
-            self.stack_scope['flags'].match(r'\+') and
-            text.match(r'[^\n\r\s]')):
+            re.match(r'\+', self.stack_scope['flags']) and
+            re.match(r'[^\n\r\s]', text)):
             self.stack_scope['array'].push({ 
                 "type" : "text", 
                 "value" : re.sub(r'(^\s*)|(\s*$)', '', text)
@@ -285,7 +285,7 @@ class Loader:
                 self.stack_scope['array_first_key'] == key):
                 self.scope = {}
                 self.stack_scope['array'].push(self.scope)
-            if self.stack_scope['flags'].match(r'\+'):
+            if re.match(r'\+', self.stack_scope['flags']):
                 self.scope['type'] = key
                 # key = 'content'
             else:
@@ -304,19 +304,18 @@ class Loader:
 
 
     # -------------------------------------------------------------
-    def flush_buffer_into(self, key, options = None):
-        if options is None:
-            options = {}
+    def flush_buffer_into(self, key, replace = False):
         existing_buffer_key = self.buffer_key
         value = self.flush_buffer()
 
-        if options['replace']:
+        if replace:
             if self.is_quoted:
                 self.buffer_string = value
             else:
                 value = re.sub(r'^\s*', '',
                                self.format_value(value, 'replace'))
-                self.buffer_string = re.match(r'\s*\Z', value).group(0)
+                matched = re.match(r'\s*\Z', value)
+                self.buffer_string = matched.group(0) if matched else ""
             self.buffer_key = existing_buffer_key
         else:
             value = self.format_value(value, 'append')
@@ -325,7 +324,7 @@ class Loader:
         print("    flushed content = {}".format(repr(value)))
 
         if isinstance(key, list):
-            if options['replace']:
+            if replace:
                 key[-1] = ''
             key[-1] += value
 
@@ -334,14 +333,14 @@ class Loader:
             self.buffer_scope = self.scope
 
             for bit in key_bits[:-1]:
-                if isinstance(self.buffer_scope[bit], str):
-                    self.buffer_scope[bit] = {} # reset
                 if ('bit' not in self.buffer_scope or
                     not self.buffer_scope[bit]):
                     self.buffer_scope[bit] = {}
+                if isinstance(self.buffer_scope[bit], str):
+                    self.buffer_scope[bit] = {} # reset
                 self.buffer_scope = self.buffer_scope[bit]
 
-            if options['replace']:
+            if replace or key_bits[-1] not in self.buffer_scope:
                 self.buffer_scope[key_bits[-1]] = ''
             self.buffer_scope[key_bits[-1]] += value
 
@@ -385,4 +384,4 @@ def loads(peml):
     Returns:
         Dict: Structured data representation
     '''
-    return Loader().load(StringIO(aml))
+    return Loader().load(StringIO(peml))
