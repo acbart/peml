@@ -19,6 +19,9 @@ class PemlFiles(unittest.TestCase):
         with open('test/palindrome.peml', 'r') as palindrome_file:
             data = peml.load(palindrome_file)
         self.assertTrue(data)
+        self.assertIsInstance(data, dict)
+        self.assertIn('exercise_id', data)
+        self.assertEqual(data['exercise_id'], 'edu.vt.cs.cs1114.sp2018.simple-PEML-example')
 
 if __name__ == '__main__':
     unittest.main(buffer=False)
