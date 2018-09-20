@@ -22,6 +22,10 @@ class PemlFiles(unittest.TestCase):
         self.assertIsInstance(data, dict)
         self.assertIn('exercise_id', data)
         self.assertEqual(data['exercise_id'], 'edu.vt.cs.cs1114.sp2018.simple-PEML-example')
+        
+        self.assertIn('systems', data)
+        self.assertIsInstance(data['systems'], list)
+        self.assertEqual(len(data['systems']), 4)
 
 if __name__ == '__main__':
     unittest.main(buffer=False)
